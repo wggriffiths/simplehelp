@@ -11,12 +11,7 @@ if [ ! -z "$1" ]; then
     install="$1"
 fi
 
-# BACKUP DIR (tar archives).
-backup_dir=/mnt/samba/backups
-# LAST CONFIGURATION DIR 
-last_config_dir=/mnt/samba/backups/last-configuration
-
-# Check permissions
+# Check permissions of install_dir
 parentdir="$(dirname "$install_dir")"
 if [ ! -w "$parentdir" ]; then
     echo "[ERROR] Insufficient permissions to write installation files in $parentdir" >&2
@@ -29,6 +24,11 @@ if [ -d "$install_dir" ]; then
     fi
 fi
 
+# BACKUP DIR (tar archives).
+backup_dir=/mnt/samba/backups
+# FULL BACKUP DIR (tar archives)
+full_backup_dir=/mnt/samba/backups/last-configuration
+
 # add a bit of colour to the menus
 colBlue="\e[34m"
 colGreen="\e[32m"
@@ -36,72 +36,166 @@ colRed="\e[31m"
 colEnd="\e[0m"
 
 SH_Ver=0
+SH_Build=0
+
+function SH_Prequisites () {
+# SimpleHelp Prequisites Check Function *
+#                                       *
+# Very experimental this function       *
+# check if sh running before showing    *
+# menu, then check for server response  *
+# 
+#****************************************         
+
+sh_response=0
+retries=0
+
+if [ "$(SH_ServiceStatus)" = "no" ]; then
+	# Just exit
+	echo "SH Running: [$(ColorGreen "no")]"
+	sleep 1
+	return 0
+else
+	echo "SH Running: [$(ColorGreen "yes")]"
+	# stay in the loop until response from server or retries = 5
+	# NOTE: if two expressions then use [[ a = b || c = c ]]
+	until [ $retries = "5" ]
+	do
+		if [ $(SH_Get_Build) != "0" ]; then
+			# got a reponse
+
+			# get sh build and version
+			# into global variables
+			SH_Build=$(SH_Get_Build)
+			SH_Ver=$(SH_Get_Version)
+
+			echo "Build: [$(ColorGreen "$SH_Build")]"
+			echo "Version: [$(ColorGreen "$SH_Ver")]"
+
+			# Experimental, check if update available and set global flag
+			if [  $(SH_LatestBuild) != SH_Build ];  then
+				SH_UpdateAvailable="1"
+				echo "Update Available: [$(ColorGreen "$(SH_LatestBuild)")]"
+			fi
+
+			sleep 2
+			return 0
+		fi
+
+		# just make sure we only stay in this loop so long
+		((retries=retries+1))
+		#Just sleep 2 sec
+		sleep 2
+
+	done
+
+	# if the retries = 5 then just exit
+	return 0
+fi
+}
 
 function SH_Backup () {
 # * SimpleHelp Backup Function                   *
 # ************************************************
 
-	clear
-	
-	local sh_build=$(SH_AllVersions)
-	local sh_archive="simplehelp_backup_"$(date +"%Y%m%d_%H%M%S")
-	local sh_config="$install_dir/configuration/"
-	local tar_command="$backup_dir/$sh_archive.tar  configuration"
-	
-	echo "*-------------------------------------**-------------------------------------*"
-	echo "*  Backup SimpleHelp Configuration..."
-	echo "*----------------------------------------------------------------------------*"
-	#echo "*"
-	echo -e "*  Backup Archive:		[${colGreen}$sh_archive.tar${colEnd}]"
-	echo -e "*  Configuration Directory :	[${colGreen}$sh_config${colEnd}]"
-	echo -e "*  Backup Directory:		[${colGreen}$backup_dir${colEnd}]"
-	#echo "*"
-	echo "*----------------------------------------------------------------------------*"
-    echo 
-	echo "Please wait.."
-	
-	SH_ServiceStop
-	#cd $install_dir
-	
-	# CONFIG BACKUP
-	# save configuration to tar 
-	# **************************
-	echo "Creating archive: $sh_archive.tar" 
-	tar -cf $tar_command
-	# save the current sh ver with backup
-	echo "Creating version file: $sh_archive.txt" 
-	echo "$sh_build" >> "$backup_dir/$sh_archive.txt"
-	
-	SH_ServiceStart
-	echo 
-	read -p 'Press any key to continue... ' nullChoice
-	
-	return 1
+local sh_full_backup="n"	# n = no / y = yes
+local sh_archive="0"
+local sh_build=$(SH_AllVersions)
+#local sh_archive="simplehelp_backup_"$(date +"%Y%m%d_%H%M%S")
+local sh_config="$install_dir/configuration/"
+local tar_command="$backup_dir/$sh_archive.tar  configuration"
+
+clear
+
+echo "*----------------------------------------------------------------------------*"
+echo "*  Backup..."
+echo "*----------------------------------------------------------------------------*"
+echo
+read -p '(F)ull or (C)onfiguration: ' mnuChoice
+
+if [  "$mnuChoice" = "F" ] || [  "$mnuChoice" = "f" ]; then
+	sh_full_backup="y"
+	sh_archive="Full_Simplehelp_Backup_"$(date +"%Y%m%d_%H%M%S")
+	tar_command="$backup_dir/full/$sh_archive.tar SimpleHelp"
+elif [  "$mnuChoice" = "C" ] || [  "$mnuChoice" = "c" ]; then
+	sh_archive="simplehelp_backup_"$(date +"%Y%m%d_%H%M%S")
+	tar_command="$backup_dir/$sh_archive.tar  configuration"
+fi
+
+clear
+
+echo "*-------------------------------------**-------------------------------------*"
+echo "*  Backup SimpleHelp Configuration..."
+echo "*----------------------------------------------------------------------------*"
+#echo "*"
+echo -e "*  Backup Archive:		[${colGreen}$sh_archive.tar${colEnd}]"
+echo -e "*  Configuration Directory :	[${colGreen}$sh_config${colEnd}]"
+echo -e "*  Backup Directory:		[${colGreen}$backup_dir${colEnd}]"
+#echo "*"
+echo "*----------------------------------------------------------------------------*"
+echo 
+echo "Please wait.."
+
+SH_ServiceStop
+#cd $install_dir
+
+# CONFIG BACKUP
+# save configuration to tar 
+# **************************
+echo "Creating archive: $sh_archive.tar" 
+tar -cf $tar_command
+# save the current sh ver with backup
+echo "Creating version file: $sh_archive.txt" 
+echo "$sh_build" >> "$backup_dir/$sh_archive.txt"
+
+SH_ServiceStart
+echo 
+read -p 'Press any key to continue... ' nullChoice
+
+return 1
 }
 
 function SH_Restore () {
-# * SimpleHelp Install and Upgrade Function      *
+# * SimpleHelp Restore Function      *
 # ************************************************
 
 local validChoice=0
 local sh_build=$(SH_AllVersions)
+local sh_full_backup="n"			# n = no / y = yes
+local sh_restore_type="c"			# c = configuration / f = full
+
+clear
+
+echo "*----------------------------------------------------------------------------*"
+echo "*  Restore..."
+echo "*----------------------------------------------------------------------------*"
+echo
+read -p '(F)ull or (C)onfiguration: ' mnuChoice
+
+if [  "$mnuChoice" = "F" ] || [  "$mnuChoice" = "f" ]; then
+
+	sh_archive="Full_Simplehelp_Backup_"$(date +"%Y%m%d_%H%M%S")
+
+elif [  "$mnuChoice" = "C" ] || [  "$mnuChoice" = "c" ]; then
+	echo
+fi
 
 until [  "$validChoice" = "1" ]
 do
 	clear
-	
+
 	sh_archive="Full_Simplehelp_Backup_"$(date +"%Y%m%d_%H%M%S")
-	tar_command="$last_config_dir/$sh_archive.tar SimpleHelp"  #configuration
-	
+	tar_command="$full_backup_dir/$sh_archive.tar SimpleHelp"  #configuration
+
 	n=1
-	
+
 	echo "*----------------------------------------------------------------------------*"
 	echo "*  Restore SimpleHelp Configuration..."
 	echo "*----------------------------------------------------------------------------*"
 	echo
 	echo "  Available Backups:"
 	echo " -----------------------------------------------------------------------------"
-	
+
 	for entry in "$backup_dir"/*.tar
 	do
 		echo "  $n: $entry"
@@ -113,7 +207,7 @@ do
 	done
 
 	echo
-	
+
 	read -p 'Select a backup to restore: ' mnuChoice
 
 	fchoice=${files[$mnuChoice]}
@@ -124,18 +218,18 @@ do
                 #Exit loop if valid selection
 		validChoice=1
 	fi
-	
+
 done
 
 	echo
 	echo "*----------------------------------------------------------------------------*"
 	echo -e "*  Archive: [${colGreen}${files[$mnuChoice]}${colEnd}]"
 	echo -e "*  Installation Dir: [${colGreen}$install_dir/configuration${colEnd}]"
-	echo -e "*  Configuration Backup Dir:  [${colGreen}$last_config_dir${colEnd}]"
+	echo -e "*  Configuration Backup Dir:  [${colGreen}$full_backup_dir${colEnd}]"
 	echo "*----------------------------------------------------------------------------*"
 	echo
 	read -p 'Continue (Y)es or (n)o? Default : Yes ' mnuChoice
-	
+
 	if [  "$mnuChoice" = "Y" ] || [  "$mnuChoice" = "y" ]; then
 		#echo "Stopping..."
 		#exit 0
@@ -146,15 +240,15 @@ done
 		# Save this to tar with $now
 		echo "Saving backup to: $sh_archive"
 		cd $install_dir
-		cd ..
-		
+		#cd ..
+
 		# FULL BACKUP
 		# save install to tar 
 		# **************************
 		tar -cf $tar_command
 		# save the current sh ver with backup
-		echo "$sh_build" >> "$last_config_dir/$sh_archive.txt"
-		
+		echo "$sh_build" >> "$full_backup_dir/$sh_archive.txt"
+
 		#  move current config
 		echo "Moving current config..."
 		#mv -R "$install_dir"/configuration/  "$install_dir"/
@@ -162,9 +256,9 @@ done
 		# restore config from tar
 		echo "Restoring configuration from archive..."
 		#unzip -o ${files[$FileChoice]} -d $install_dir
-		
+
 		SH_ServiceStart
-		
+
 		echo
 		read -p 'Press any key to continue... ' nullChoice
 	fi
@@ -177,7 +271,7 @@ function SH_Install_Upgrade () {
 # ************************************************
 
 	clear
-	
+
 	echo "*-------------------------------------**-------------------------------------*"
 	echo "*  Install/Upgrade SimpleHelp..."
 	echo "*----------------------------------------------------------------------------*"
@@ -186,7 +280,7 @@ function SH_Install_Upgrade () {
 	echo "*"
 	echo "*----------------------------------------------------------------------------*"
     echo 
-	
+
 	# Generate a timestamp
 	local now=$(date +"%Y%m%d_%H%M%S")
 
@@ -244,25 +338,54 @@ function SH_Install_Upgrade () {
 
 	# Start the new server
 	SH_ServiceStart
-	
+
 	echo
 	read -p 'Press any key to continue... ' nullChoice
-	
+
 	return 5 
 }
 
 function SH_Utils () {
 
-result="`wget -qO- http://127.0.0.1/allversions`"
 #result=($(result//\n/ })
-echo  $result 
-#echo $("$result" | grep "SH Version" | awk '{print $3}' | sed s/"SSuite-"//)
-read -p 'Press any key to continue... ' nullChoice
+#| awk '{print $1}'
+#result="`wget -qO- http://127.0.0.1/allversions`"
+#echo "$result" | grep "SH Version" | awk '{print $3}' | sed s/"SSuite-"//
+#echo "$result" | grep "Visual Version" | awk '{print $3}'
+#read -p 'Press any key to continue... ' nullChoice
 
 return 1
 }
 
-function SH_LatestVersion () {
+function SH_Get_Build () {
+
+result="`wget -qO- http://127.0.0.1/allversions`"
+
+if [ "$result" = "" ]; then
+	echo "0"
+	return 1
+else
+	echo "$result" | grep "SH Version" | awk '{print $3}' | sed s/"SSuite-"//
+	return 0
+fi
+
+}
+
+function SH_Get_Version {
+
+result="`wget -qO- http://127.0.0.1/allversions`"
+
+if [ "$result" = "" ]; then
+	echo "0"
+	return 1
+else
+	echo "$result" | grep "Visual Version" | awk '{print $3}'
+	return 0
+fi
+
+}
+
+function SH_LatestBuild () {
 # * SimpleHelp Latest Version Function           *
 # ************************************************
 
@@ -279,30 +402,6 @@ result="`wget -qO- http://127.0.0.1/allversions`"
 echo "$result"
 }
 
-function SH_CurentVersion () {
-# * SimpleHelp  Current Version Function                        *
-# * Try and get the current sh version from the running server. *
-# ***************************************************************
-
-wget  -q http://127.0.0.1/allversions -O /tmp/sh_info
-result=$(cat /tmp/sh_info | grep "SH Version" | awk '{print $3}' | sed s/"SSuite-"//)
-
-#shver=$(cat /tmp/sh_info | grep "Visual Version" | awk '{print $3}' | sed s/"SSuite-"//)
-#SH_Ver=$shver
-#echo $SH_Ver
-
-rm /tmp/sh_info
-
-if [ "$result" = "" ]; then
-	echo "0"
-	return 1
-else
-	echo "$result"
-	return 0
-fi
-
-}
-
 function SH_ServiceStatus () {
 # * SimpleHelp Service Status Function           *
 # ************************************************
@@ -316,14 +415,14 @@ function SH_ServiceStatus () {
 		echo "yes"
 		return 1
 	fi
-	
+
 	# return value 0 and 1 are returned in $?
 }
 
 function SH_ServiceStart () {
 # * SimpleHelp Service Start Function            *
 # ************************************************
-	
+
 	if [ "$(SH_ServiceStatus)" = "yes" ]; then 
 		#SH Already running
 		echo "Already Running.."
@@ -333,7 +432,12 @@ function SH_ServiceStart () {
 		echo "Starting Service..."
 		cd "$install_dir"
 		sh serverstart.sh >/dev/null 2>&1
-		sleep 5
+		# wait until the server responds, before exit.
+		until [ "$(SH_Get_Version)" != "0" ]
+		do
+			sleep 2
+		done
+		#sleep 5
 		return 1
 	#else
 	#	#Failed to start
@@ -350,7 +454,12 @@ function SH_ServiceStop () {
 		echo "Stopping Service.."
 		cd "$install_dir"
 		sh serverstop.sh >/dev/null 2>&1
-		sleep 15
+		# wait until the server syops responding, before exit.
+		until [ "$(SH_Get_Version)" = "0" ]
+		do
+			sleep 2
+		done
+ 		#sleep 15
 		return 1
 	elif [ "$(SH_ServiceStatus)" = "no" ]; then
 		#Start SH
@@ -399,57 +508,6 @@ function ColorBlue(){
 	echo -ne $colBlue$1$colEnd
 }
 
-function SH_Prequisites () {
-# SimpleHelp Prequisites Check Function *
-#                                       *
-# Very experimental this function       *
-# check if sh running before showing    *
-# menu, then check for server response  *
-# 
-#****************************************         
-
-sh_response=0
-retries=0
-
-if [ "$(SH_ServiceStatus)" = "no" ]; then
-	# Just exit
-	echo "SH Running: [$(ColorGreen "no")]"
-	sleep 1
-	return 1
-else
-	echo "SH Running: [$(ColorGreen "yes")]"
-	# stay in the loop until response from server or retries = 5
-	# NOTE: if two expressions then use [[ a = b || c = c ]]
-	until [ $retries = "5" ]
-	do
-		if [ $(SH_CurentVersion) != "0" ]; then
-			# got a reponse
-			echo "Build: [$(ColorGreen "$(SH_CurentVersion)")]"
-			echo "Version: [$(ColorGreen "$SH_Ver")]"
-			
-			# Experimental, check if update available and set global flag
-			if [  $(SH_LatestVersion) != $(SH_CurentVersion) ];  then
-				SH_UpdateAvailable="1"
-				echo "Update Available: [$(ColorGreen "$(SH_LatestVersion)")]"
-			fi
-			
-			sleep 2
-			return 0
-		fi
-		
-		# just make sure we only stay in this loop so long
-		((retries=retries+1))
-		#Just sleep 2 sec
-		sleep 2
-		
-	done
-	
-	echo "nooooo"
-	# shouldnt really get to here.
-	return 0
-fi
-}
-
 # ************************************************
 # * SimpleHelp Server helper script v1 MAIN MENU *
 # ************************************************
@@ -460,42 +518,46 @@ SH_UpdateAvailable="0"
 # 1) check if sh running, if not show menu
 # 2) if running try and get a response from server.
 # 3) if response update global variables, then show menu.
-
 SH_Prequisites
 
-#echo "$?"
+#echo "[ERROR]:$(ColorRed "$?") ------" >&2
 #exit 1
+
+#SH_Main_Menu
 
 # In a loop from here until x
 until [  "$mnuChoice" = "X" ] || [  "$mnuChoice" = "x" ]
 do
 	clear
-	
+
+
+
 	#echo -e $(ColorBlue "Testing testing.....")
 	echo "*----------------------------------------------------------------------------*"
 	echo -e "*  SimpleHelp Server Tools v1"
 	echo "*----------------------------------------------------------------------------*"
-	echo -e "*  Install Dir: [${colGreen}$install_dir${colEnd}]	SH Build: [${colGreen}$(SH_CurentVersion)${colEnd}]"
-	echo -e "*  Backup Dir : [${colGreen}$backup_dir${colEnd}]	SimpleHelp Running: [${colGreen}$(SH_ServiceStatus)${colEnd}]"
+	echo -e "*  Install Dir: [${colGreen}$install_dir${colEnd}]	SH Build: [${colGreen}$SH_Build${colEnd}]"
+	echo -e "*  Backup Dir : [${colGreen}$backup_dir${colEnd}]	SH Ver: [${colGreen}$SH_Ver${colEnd}]  SH Running: [${colGreen}$(SH_ServiceStatus)${colEnd}]"
 	echo "*----------------------------------------------------------------------------*"
 	echo ""
-	echo "  1: Backup SimpleHelp Configuration."
-	echo "  2: Restore SimpleHelp Configuration."
-	
+	echo "  1: Backup."
+	echo "  2: Restore."
+
 	# Show if update available, bit experimental
 	if [ $SH_UpdateAvailable = "1" ];  then
-		echo -e "  3: Install/Upgrade SimpleHelp. $colGreen[Update Available]$colEnd"
+		echo -e "  3: Install/Update. $colGreen[Update Available]$colEnd"
 	elif [ $SH_UpdateAvailable = "0" ];  then
-		echo "  3: Install/Upgrade SimpleHelp."
+		echo "  3: Install/Update."
 	fi
-	
-	echo "  4: Utilities"
+
+	echo "  4: Utilities."
 	echo "  x: Exit."
-	echo ""
-	#echo ""
+	echo
 
-	read -p 'Choose an option: ' mnuChoice
+	# read -p 'xx' -t 0.01 retval
+	read -p 'Choose an option:' mnuChoice
 
+	# could stay in a loop with this
 		if [  "$mnuChoice" = "1" ]; then 
 			echo "SimpleHelp Backup..."
 			SH_Backup
@@ -507,8 +569,11 @@ do
 			SH_Install_Upgrade
 		elif [  "$mnuChoice" = "4" ]; then
 			echo "Utilities..."
-			SH_Utils
+			sleep 4
 		fi
+
+		#echo "[ERROR]:$(ColorRed "$?") ------" >&2
+		#sleep 4
 done
 
 cd $initial_dir
