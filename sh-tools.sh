@@ -25,9 +25,9 @@ if [ -d "$install_dir" ]; then
 fi
 
 # BACKUP DIR (tar archives).
-backup_dir=/mnt/samba/backups
+backup_dir="/mnt/samba/backups"
 # FULL BACKUP DIR (tar archives)
-full_backup_dir=/mnt/samba/backups/last-configuration
+full_backup_dir="$backup_dir/full"
 
 # add a bit of colour to the menus
 colBlue="\e[34m"
@@ -345,18 +345,6 @@ function SH_Install_Upgrade () {
 	return 5 
 }
 
-function SH_Utils () {
-
-#result=($(result//\n/ })
-#| awk '{print $1}'
-#result="`wget -qO- http://127.0.0.1/allversions`"
-#echo "$result" | grep "SH Version" | awk '{print $3}' | sed s/"SSuite-"//
-#echo "$result" | grep "Visual Version" | awk '{print $3}'
-#read -p 'Press any key to continue... ' nullChoice
-
-return 1
-}
-
 function SH_Get_Build () {
 
 result="`wget -qO- http://127.0.0.1/allversions`"
@@ -423,9 +411,13 @@ function SH_ServiceStart () {
 # * SimpleHelp Service Start Function            *
 # ************************************************
 
+# Keep track of the current directory.
+current_dir="$PWD"
+
 	if [ "$(SH_ServiceStatus)" = "yes" ]; then 
 		#SH Already running
 		echo "Already Running.."
+		cd $current_dir
 		return 0
 	elif [ "$(SH_ServiceStatus)" = "no" ]; then
 		#Start SH
@@ -438,6 +430,7 @@ function SH_ServiceStart () {
 			sleep 2
 		done
 		#sleep 5
+		cd $current_dir
 		return 1
 	#else
 	#	#Failed to start
@@ -449,6 +442,10 @@ function SH_ServiceStart () {
 function SH_ServiceStop () {
 # * SimpleHelp Service Stop Function             *
 # ************************************************
+
+# Keep track of the current directory.
+current_dir="$PWD"
+
 	if [ "$(SH_ServiceStatus)" = "yes" ]; then 
 		#SH running, stop service
 		echo "Stopping Service.."
@@ -460,10 +457,12 @@ function SH_ServiceStop () {
 			sleep 2
 		done
  		#sleep 15
+		cd $current_dir
 		return 1
 	elif [ "$(SH_ServiceStatus)" = "no" ]; then
 		#Start SH
 		echo "Service not running..."
+		cd $current_dir
 		return 0
 	#else
 	#	#Failed to stop
