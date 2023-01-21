@@ -44,7 +44,7 @@ function SH_Prequisites () {
 # Very experimental this function       *
 # check if sh running before showing    *
 # menu, then check for server response  *
-# 
+# ** also check if backup paths exist **
 #****************************************         
 
 sh_response=0
@@ -112,7 +112,7 @@ echo
 read -p '(F)ull or (C)onfiguration: ' mnuChoice
 
 if [  "$mnuChoice" = "F" ] || [  "$mnuChoice" = "f" ]; then
-	sh_archive="Full_Simplehelp_Backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
+	sh_archive="full_simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
 	tar_command="$full_backup_dir/$sh_archive.tar SimpleHelp"
 elif [  "$mnuChoice" = "C" ] || [  "$mnuChoice" = "c" ]; then
 	sh_archive="simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
@@ -163,8 +163,9 @@ function SH_Restore () {
 
 local validChoice=0
 local sh_build=$(SH_AllVersions)
-local sh_full_backup="n"			# n = no / y = yes
-local sh_restore_type="c"			# c = configuration / f = full
+local sh_full_backup=0				# 0 = no / 1 = yes
+local sh_create_backup=0			# 0 = no / 1 = yes
+local sh_backup_root=""
 
 clear
 
@@ -175,32 +176,42 @@ echo
 read -p '(F)ull or (C)onfiguration: ' mnuChoice
 
 if [  "$mnuChoice" = "F" ] || [  "$mnuChoice" = "f" ]; then
-
-	sh_archive="Full_Simplehelp_Backup_"$(date +"%Y%m%d_%H%M%S")
-
+	sh_archive="full_simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
+	tar_command="$full_backup_dir/$sh_archive.tar SimpleHelp"
+	sh_backup_root=$full_backup_dir
+	sh_full_backup=1
 elif [  "$mnuChoice" = "C" ] || [  "$mnuChoice" = "c" ]; then
-	echo
+	sh_archive="simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
+	tar_command="$backup_dir/$sh_archive.tar  configuration"
+	sh_backup_root=$backup_dir
+	sh_full_backup=0
+fi
+
+# ask do you want to create a backup here, would be full or config
+# depending on selection above.
+read -p 'Do you want to create a backup (y)es (n)o: ' mnuChoice
+
+if [  "$mnuChoice" = "Y" ] || [  "$mnuChoice" = "y" ]; then
+	sh_create_backup=1
 fi
 
 until [  "$validChoice" = "1" ]
 do
 	clear
 
-	sh_archive="Full_Simplehelp_Backup_"$(date +"%Y%m%d_%H%M%S")
-	tar_command="$full_backup_dir/$sh_archive.tar SimpleHelp"  #configuration
-
 	n=1
 
+	#echo "*----------------------------------------------------------------------------*"
+	#echo "*  Restore Backup..."
 	echo "*----------------------------------------------------------------------------*"
-	echo "*  Restore SimpleHelp Configuration..."
-	echo "*----------------------------------------------------------------------------*"
-	echo
+	#echo
 	echo "  Available Backups:"
 	echo " -----------------------------------------------------------------------------"
 
-	for entry in "$backup_dir"/*.tar
+	for entry in "$sh_backup_root"/*.tar
 	do
-		echo "  $n: $entry"
+		echo "$n: $(basename ${entry})"
+		#echo "  $n: $entry"
 		#echo $n":" "$entry"
 		#backups[$n]=$entry
 		files[$n]="$entry"
@@ -225,38 +236,39 @@ done
 
 	echo
 	echo "*----------------------------------------------------------------------------*"
-	echo -e "*  Archive: [${colGreen}${files[$mnuChoice]}${colEnd}]"
-	echo -e "*  Installation Dir: [${colGreen}$install_dir/configuration${colEnd}]"
-	echo -e "*  Configuration Backup Dir:  [${colGreen}$full_backup_dir${colEnd}]"
+	echo -e "*  Archive: [${colGreen} $(basename ${files[$mnuChoice]})${colEnd}]"
+	#echo -e "*  Installation Dir: [${colGreen}$install_dir/configuration${colEnd}]"
+	#echo -e "*  Configuration Backup Dir:  [${colGreen}$sh_backup_root${colEnd}]"
 	echo "*----------------------------------------------------------------------------*"
 	echo
-	read -p 'Continue (Y)es or (n)o? Default : Yes ' mnuChoice
+	read -p 'Restore (Y)es or (n)o: ' mnuChoice
 
 	if [  "$mnuChoice" = "Y" ] || [  "$mnuChoice" = "y" ]; then
-		#echo "Stopping..."
-		#exit 0
-	#else
+	
 		SH_ServiceStop
 
-		# backup current config to archive
-		# Save this to tar with $now
-		echo "Saving backup to: $sh_archive"
-		cd $install_dir
-		#cd ..
+		if [  "$sh_full_backup" = "1" ]; then
+			cd $install_dir/..
+		else
+			cd $install_dir
+		fi
 
-		# FULL BACKUP
-		# save install to tar 
+		# BACKUP
+		# save to tar 
 		# **************************
-		tar -cf $tar_command
-		# save the current sh ver with backup
-		echo "$sh_build" >> "$full_backup_dir/$sh_archive.txt"
+		if [  "$sh_create_backup" = "1" ]; then
+			# Save backup
+			echo "Saving backup to: $sh_archive.tar"
+			#echo "$sh_build" >> "$full_backup_dir/$sh_archive.txt"
+			tar -cf $tar_command
+		fi
 
 		#  move current config
-		echo "Moving current config..."
+		echo "removing current installation..."
 		#mv -R "$install_dir"/configuration/  "$install_dir"/
 
-		# restore config from tar
-		echo "Restoring configuration from archive..."
+		# restore from backup
+		echo "Restoring backup from archive..."
 		#unzip -o ${files[$FileChoice]} -d $install_dir
 
 		SH_ServiceStart
