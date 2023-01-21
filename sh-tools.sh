@@ -98,10 +98,8 @@ function SH_Backup () {
 # * SimpleHelp Backup Function                   *
 # ************************************************
 
-local sh_full_backup="n"	# n = no / y = yes
 local sh_archive="0"
 local sh_build=$(SH_AllVersions)
-#local sh_archive="simplehelp_backup_"$(date +"%Y%m%d_%H%M%S")
 local sh_config="$install_dir/configuration/"
 local tar_command="$backup_dir/$sh_archive.tar  configuration"
 
@@ -114,44 +112,48 @@ echo
 read -p '(F)ull or (C)onfiguration: ' mnuChoice
 
 if [  "$mnuChoice" = "F" ] || [  "$mnuChoice" = "f" ]; then
-	sh_full_backup="y"
-	sh_archive="Full_Simplehelp_Backup_"$(date +"%Y%m%d_%H%M%S")
-	tar_command="$backup_dir/full/$sh_archive.tar SimpleHelp"
+	sh_archive="Full_Simplehelp_Backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
+	tar_command="$full_backup_dir/$sh_archive.tar SimpleHelp"
 elif [  "$mnuChoice" = "C" ] || [  "$mnuChoice" = "c" ]; then
-	sh_archive="simplehelp_backup_"$(date +"%Y%m%d_%H%M%S")
+	sh_archive="simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
 	tar_command="$backup_dir/$sh_archive.tar  configuration"
 fi
 
 clear
 
 echo "*-------------------------------------**-------------------------------------*"
-echo "*  Backup SimpleHelp Configuration..."
+echo "*  Backup..."
 echo "*----------------------------------------------------------------------------*"
 #echo "*"
-echo -e "*  Backup Archive:		[${colGreen}$sh_archive.tar${colEnd}]"
-echo -e "*  Configuration Directory :	[${colGreen}$sh_config${colEnd}]"
-echo -e "*  Backup Directory:		[${colGreen}$backup_dir${colEnd}]"
+echo -e "*  Backup Archive: [${colGreen}$sh_archive.tar${colEnd}]"
+echo -e "*  Configuration Directory : [${colGreen}$sh_config${colEnd}]"
+echo -e "*  Backup Directory: [${colGreen}$backup_dir${colEnd}]"
 #echo "*"
 echo "*----------------------------------------------------------------------------*"
 echo 
 echo "Please wait.."
 
 SH_ServiceStop
-#cd $install_dir
 
-# CONFIG BACKUP
-# save configuration to tar 
-# **************************
-echo "Creating archive: $sh_archive.tar" 
-tar -cf $tar_command
 # save the current sh ver with backup
 echo "Creating version file: $sh_archive.txt" 
-echo "$sh_build" >> "$backup_dir/$sh_archive.txt"
+
+# Change to the correct dir
+# before backup
+# **************************
+if [  "$mnuChoice" = "F" ] || [  "$mnuChoice" = "f" ]; then
+	echo "$sh_build" >> "$full_backup_dir/$sh_archive.txt"
+	cd $install_dir/..
+else
+	echo "$sh_build" >> "$backup_dir/$sh_archive.txt"
+	cd $install_dir
+fi
+
+echo "Creating archive: $sh_archive.tar" 
+tar -cf $tar_command
 
 SH_ServiceStart
 echo 
-read -p 'Press any key to continue... ' nullChoice
-
 return 1
 }
 
@@ -410,14 +412,9 @@ function SH_ServiceStatus () {
 function SH_ServiceStart () {
 # * SimpleHelp Service Start Function            *
 # ************************************************
-
-# Keep track of the current directory.
-current_dir="$PWD"
-
 	if [ "$(SH_ServiceStatus)" = "yes" ]; then 
 		#SH Already running
 		echo "Already Running.."
-		cd $current_dir
 		return 0
 	elif [ "$(SH_ServiceStatus)" = "no" ]; then
 		#Start SH
@@ -430,22 +427,13 @@ current_dir="$PWD"
 			sleep 2
 		done
 		#sleep 5
-		cd $current_dir
 		return 1
-	#else
-	#	#Failed to start
-	#	echo "Failed to start.."
-	#	return 0
 	fi
 }
 
 function SH_ServiceStop () {
 # * SimpleHelp Service Stop Function             *
 # ************************************************
-
-# Keep track of the current directory.
-current_dir="$PWD"
-
 	if [ "$(SH_ServiceStatus)" = "yes" ]; then 
 		#SH running, stop service
 		echo "Stopping Service.."
@@ -457,17 +445,11 @@ current_dir="$PWD"
 			sleep 2
 		done
  		#sleep 15
-		cd $current_dir
 		return 1
 	elif [ "$(SH_ServiceStatus)" = "no" ]; then
 		#Start SH
 		echo "Service not running..."
-		cd $current_dir
 		return 0
-	#else
-	#	#Failed to stop
-	#	echo "Failed to stop.."
-	#	return 0
 	fi
 }
 
@@ -554,7 +536,7 @@ do
 	echo
 
 	# read -p 'xx' -t 0.01 retval
-	read -p 'Choose an option:' mnuChoice
+	read -p 'Choose an option: ' mnuChoice
 
 	# could stay in a loop with this
 		if [  "$mnuChoice" = "1" ]; then 
