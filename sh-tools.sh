@@ -5,6 +5,9 @@ clear
 # Keep track of the initial directory.
 initial_dir="$PWD"
 
+# sh-tools.sh pid file
+sh_pid="/var/run/sh-tools.pid"
+
 # SIMPLEHELP INSTALLATION DIR
 install_dir="/opt/SimpleHelp"
 if [ ! -z "$1" ]; then
@@ -24,9 +27,9 @@ if [ -d "$install_dir" ]; then
     fi
 fi
 
-# BACKUP DIR (tar archives).
+# BACKUP DIR [tar archives].
 backup_dir="/mnt/samba/backups"
-# FULL BACKUP DIR (tar archives)
+# FULL BACKUP DIR [tar archives].
 full_backup_dir="$backup_dir/full"
 
 # add a bit of colour to the menus
@@ -37,7 +40,6 @@ colEnd="\e[0m"
 
 SH_Ver=0
 SH_Build=0
-
 
 # SimpleHelp Prequisites Check Function *
 #                                       *
@@ -50,6 +52,30 @@ function SH_Prequisites () {
 
 sh_response=0
 retries=0
+
+# check if were already running another instance
+for pid in $(pidof -x sh-tools.sh); do
+		if [ $pid != $$ ]; then
+			# warn and exit
+			echo "*-----------------------------------------------------------------"
+			echo "*  Warning: [$(ColorRed "sh-tools.sh is already running with PID $pid")]"
+			echo "*  Do you want to terminate this process..."
+			echo "*-----------------------------------------------------------------"
+			echo 
+
+			until [  "$mnuChoice" = "Y" ] || [  "$mnuChoice" = "y" ] || [  "$mnuChoice" = "N" ] || [  "$mnuChoice" = "n" ]
+			do
+				read -p '(Y)es (N)o: ' mnuChoice
+
+				if [  "$mnuChoice" = "Y" ] || [  "$mnuChoice" = "y" ]; then
+					kill $pid
+					trap "rm -f $sh_pid" EXIT
+				fi
+			done
+
+			exit 1
+    	fi
+done
 
 if [ "$(SH_ServiceStatus)" = "no" ]; then
 	# Just exit
@@ -527,10 +553,13 @@ SH_UpdateAvailable="0"
 # 3) if response update global variables, then show menu.
 SH_Prequisites
 
-#echo "[ERROR]:$(ColorRed "$?") ------" >&2
-#exit 1
+# save PID to pid file
+# if this already exists in prequisites
+# then were already running another instance.
+############################################## 
+echo $$ > "$sh_pid"
 
-#SH_Main_Menu
+#echo "[ERROR]:$(ColorRed "$?") ------" >&2
 
 # In a loop from here until x
 until [  "$mnuChoice" = "X" ] || [  "$mnuChoice" = "x" ]
@@ -581,4 +610,5 @@ do
 		#sleep 4
 done
 
+trap "rm -f $sh_pid" EXIT
 cd $initial_dir
