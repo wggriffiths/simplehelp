@@ -38,14 +38,15 @@ colEnd="\e[0m"
 SH_Ver=0
 SH_Build=0
 
-function SH_Prequisites () {
+
 # SimpleHelp Prequisites Check Function *
 #                                       *
 # Very experimental this function       *
 # check if sh running before showing    *
 # menu, then check for server response  *
 # ** also check if backup paths exist **
-#****************************************         
+#****************************************   
+function SH_Prequisites () {
 
 sh_response=0
 retries=0
@@ -94,9 +95,10 @@ else
 fi
 }
 
+
+# * SimpleHelp Backup Function                   
+# *************************************************************
 function SH_Backup () {
-# * SimpleHelp Backup Function                   *
-# ************************************************
 
 local sh_archive="0"
 local sh_build=$(SH_AllVersions)
@@ -109,26 +111,28 @@ echo "*-------------------------------------------------------------------------
 echo "*  Backup..."
 echo "*----------------------------------------------------------------------------*"
 echo
-read -p '(F)ull or (C)onfiguration: ' mnuChoice
 
-if [  "$mnuChoice" = "F" ] || [  "$mnuChoice" = "f" ]; then
-	sh_archive="full_simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
-	tar_command="$full_backup_dir/$sh_archive.tar SimpleHelp"
-elif [  "$mnuChoice" = "C" ] || [  "$mnuChoice" = "c" ]; then
-	sh_archive="simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
-	tar_command="$backup_dir/$sh_archive.tar  configuration"
-fi
+until [  "$mnuChoice" = "F" ] || [  "$mnuChoice" = "f" ] || [  "$mnuChoice" = "C" ] || [  "$mnuChoice" = "c" ]
+do
+	read -p '(F)ull or (C)onfiguration: ' mnuChoice
+
+	if [  "$mnuChoice" = "F" ] || [  "$mnuChoice" = "f" ]; then
+		sh_archive="full_simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
+		tar_command="$full_backup_dir/$sh_archive.tar SimpleHelp"
+	elif [  "$mnuChoice" = "C" ] || [  "$mnuChoice" = "c" ]; then
+		sh_archive="simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
+		tar_command="$backup_dir/$sh_archive.tar  configuration"
+	fi
+done
 
 clear
 
 echo "*-------------------------------------**-------------------------------------*"
 echo "*  Backup..."
 echo "*----------------------------------------------------------------------------*"
-#echo "*"
 echo -e "*  Backup Archive: [${colGreen}$sh_archive.tar${colEnd}]"
 echo -e "*  Configuration Directory : [${colGreen}$sh_config${colEnd}]"
 echo -e "*  Backup Directory: [${colGreen}$backup_dir${colEnd}]"
-#echo "*"
 echo "*----------------------------------------------------------------------------*"
 echo 
 echo "Please wait.."
@@ -157,9 +161,9 @@ echo
 return 1
 }
 
+# * SimpleHelp Restore Function
+# *************************************************************
 function SH_Restore () {
-# * SimpleHelp Restore Function      *
-# ************************************************
 
 local validChoice=0
 local sh_build=$(SH_AllVersions)
@@ -167,33 +171,43 @@ local sh_full_backup=0				# 0 = no / 1 = yes
 local sh_create_backup=0			# 0 = no / 1 = yes
 local sh_backup_root=""
 
-clear
+until [  "$mnuChoice" = "F" ] || [  "$mnuChoice" = "f" ] || [  "$mnuChoice" = "C" ] || [  "$mnuChoice" = "c" ]
+do
+	clear
 
-echo "*----------------------------------------------------------------------------*"
-echo "*  Restore..."
-echo "*----------------------------------------------------------------------------*"
-echo
-read -p '(F)ull or (C)onfiguration: ' mnuChoice
+	echo "*----------------------------------------------------------------------------*"
+	echo "*  Restore type..."
+	echo "*----------------------------------------------------------------------------*"
+	echo
+	read -p '(F)ull or (C)onfiguration: ' mnuChoice
 
-if [  "$mnuChoice" = "F" ] || [  "$mnuChoice" = "f" ]; then
-	sh_archive="full_simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
-	tar_command="$full_backup_dir/$sh_archive.tar SimpleHelp"
-	sh_backup_root=$full_backup_dir
-	sh_full_backup=1
-elif [  "$mnuChoice" = "C" ] || [  "$mnuChoice" = "c" ]; then
-	sh_archive="simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
-	tar_command="$backup_dir/$sh_archive.tar  configuration"
-	sh_backup_root=$backup_dir
-	sh_full_backup=0
-fi
+	if [  "$mnuChoice" = "F" ] || [  "$mnuChoice" = "f" ]; then
+		sh_archive="full_simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
+		tar_command="$full_backup_dir/$sh_archive.tar SimpleHelp"
+		sh_backup_root=$full_backup_dir
+		sh_full_backup=1
+	elif [  "$mnuChoice" = "C" ] || [  "$mnuChoice" = "c" ]; then
+		sh_archive="simplehelp_backup_v"$SH_Ver"_"$(date +"%Y%m%d_%H%M%S")
+		tar_command="$backup_dir/$sh_archive.tar  configuration"
+		sh_backup_root=$backup_dir
+		sh_full_backup=0
+	fi
+done
 
-# ask do you want to create a backup here, would be full or config
-# depending on selection above.
-read -p 'Do you want to create a backup (y)es (n)o: ' mnuChoice
+until [  "$mnuChoice" = "Y" ] || [  "$mnuChoice" = "y" ] || [  "$mnuChoice" = "N" ] || [  "$mnuChoice" = "n" ]
+do
+	clear
 
-if [  "$mnuChoice" = "Y" ] || [  "$mnuChoice" = "y" ]; then
-	sh_create_backup=1
-fi
+	echo "*----------------------------------------------------------------------------*"
+	echo "*  Create backup before restore..."
+	echo "*----------------------------------------------------------------------------*"
+	echo 
+	read -p '(Y)es (N)o: ' mnuChoice
+
+	if [  "$mnuChoice" = "Y" ] || [  "$mnuChoice" = "y" ]; then
+		sh_create_backup=1
+	fi
+done
 
 until [  "$validChoice" = "1" ]
 do
@@ -201,12 +215,9 @@ do
 
 	n=1
 
-	#echo "*----------------------------------------------------------------------------*"
-	#echo "*  Restore Backup..."
 	echo "*----------------------------------------------------------------------------*"
-	#echo
-	echo "  Available Backups:"
-	echo " -----------------------------------------------------------------------------"
+	echo "* Select backup to restore..."
+	echo "*----------------------------------------------------------------------------*"
 
 	for entry in "$sh_backup_root"/*.tar
 	do
@@ -221,7 +232,7 @@ do
 
 	echo
 
-	read -p 'Select a backup to restore: ' mnuChoice
+	read -p 'Choose an option [1 - '$((n=n-1))']: '  mnuChoice
 
 	fchoice=${files[$mnuChoice]}
 
@@ -234,55 +245,58 @@ do
 
 done
 
-	echo
+until [  "$mnuChoice" = "Y" ] || [  "$mnuChoice" = "y" ] || [  "$mnuChoice" = "N" ] || [  "$mnuChoice" = "n" ]
+do
+	clear 
+
 	echo "*----------------------------------------------------------------------------*"
 	echo -e "*  Archive: [${colGreen} $(basename ${files[$mnuChoice]})${colEnd}]"
 	#echo -e "*  Installation Dir: [${colGreen}$install_dir/configuration${colEnd}]"
 	#echo -e "*  Configuration Backup Dir:  [${colGreen}$sh_backup_root${colEnd}]"
 	echo "*----------------------------------------------------------------------------*"
 	echo
-	read -p 'Restore (Y)es or (n)o: ' mnuChoice
+	read -p 'Restore (Y)es or (N)o: ' mnuChoice
+done
 
-	if [  "$mnuChoice" = "Y" ] || [  "$mnuChoice" = "y" ]; then
-	
-		SH_ServiceStop
+if [  "$mnuChoice" = "Y" ] || [  "$mnuChoice" = "y" ]; then
 
-		if [  "$sh_full_backup" = "1" ]; then
-			cd $install_dir/..
-		else
-			cd $install_dir
-		fi
+	SH_ServiceStop
 
-		# BACKUP
-		# save to tar 
-		# **************************
-		if [  "$sh_create_backup" = "1" ]; then
-			# Save backup
-			echo "Saving backup to: $sh_archive.tar"
-			#echo "$sh_build" >> "$full_backup_dir/$sh_archive.txt"
-			tar -cf $tar_command
-		fi
-
-		#  move current config
-		echo "removing current installation..."
-		#mv -R "$install_dir"/configuration/  "$install_dir"/
-
-		# restore from backup
-		echo "Restoring backup from archive..."
-		#unzip -o ${files[$FileChoice]} -d $install_dir
-
-		SH_ServiceStart
-
-		echo
-		read -p 'Press any key to continue... ' nullChoice
+	if [  "$sh_full_backup" = "1" ]; then
+		cd $install_dir/..
+	else
+		cd $install_dir
 	fi
+
+	# save BACKUP to tar
+	# **************************
+	if [  "$sh_create_backup" = "1" ]; then
+		# Save backup
+		echo "Saving backup to: $sh_archive.tar"
+		#echo "$sh_build" >> "$full_backup_dir/$sh_archive.txt"
+		tar -cf $tar_command
+	fi
+
+	#  move current config
+	echo "removing current installation..."
+	#mv -R "$install_dir"/configuration/  "$install_dir"/
+
+	# restore from backup
+	echo "Restoring backup from archive..."
+	#unzip -o ${files[$FileChoice]} -d $install_dir
+
+	SH_ServiceStart
+
+	echo
+	read -p 'Press any key to continue... ' nullChoice
+fi
 
 return 1
 }
 
 function SH_Install_Upgrade () {
-# * SimpleHelp Install and Upgrade Function      *
-# ************************************************
+# * SimpleHelp Install and Upgrade Function
+# *************************************************************
 
 	clear
 
@@ -387,9 +401,9 @@ fi
 
 }
 
+# * SimpleHelp Latest Version Function
+# *************************************************************
 function SH_LatestBuild () {
-# * SimpleHelp Latest Version Function           *
-# ************************************************
 
 FILE="$install_dir/configuration/latestversion"
 
@@ -404,9 +418,9 @@ result="`wget -qO- http://127.0.0.1/allversions`"
 echo "$result"
 }
 
+# * SimpleHelp Service Status Function
+# *************************************************************
 function SH_ServiceStatus () {
-# * SimpleHelp Service Status Function           *
-# ************************************************
 	#echo "checking service status.."
 	if [ -z "`ps axf | grep ProxyServerStartup | grep -v grep`" ]; then
 		# SH not running
@@ -421,9 +435,9 @@ function SH_ServiceStatus () {
 	# return value 0 and 1 are returned in $?
 }
 
+# * SimpleHelp Service Start Function
+# *************************************************************
 function SH_ServiceStart () {
-# * SimpleHelp Service Start Function            *
-# ************************************************
 	if [ "$(SH_ServiceStatus)" = "yes" ]; then 
 		#SH Already running
 		echo "Already Running.."
@@ -443,9 +457,9 @@ function SH_ServiceStart () {
 	fi
 }
 
+# * SimpleHelp Service Stop Function
+# *************************************************************
 function SH_ServiceStop () {
-# * SimpleHelp Service Stop Function             *
-# ************************************************
 	if [ "$(SH_ServiceStatus)" = "yes" ]; then 
 		#SH running, stop service
 		echo "Stopping Service.."
@@ -465,9 +479,9 @@ function SH_ServiceStop () {
 	fi
 }
 
+# * SimpleHelp SystemD Function
+# *************************************************************
 function SH_SystemD () {
-# * SimpleHelp SystemD Function                  *
-# ************************************************
 
 outFile="/mnt/samba/simplehelp.service"
 
@@ -522,8 +536,6 @@ SH_Prequisites
 until [  "$mnuChoice" = "X" ] || [  "$mnuChoice" = "x" ]
 do
 	clear
-
-
 
 	#echo -e $(ColorBlue "Testing testing.....")
 	echo "*----------------------------------------------------------------------------*"
